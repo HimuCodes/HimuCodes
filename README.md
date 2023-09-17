@@ -7,7 +7,7 @@
 
 <p align="left"> <img src="https://komarev.com/ghpvc/?username=himucodes&label=Profile%20views&color=0e75b6&style=flat" alt="himucodes" /> </p>
 
-<p align="left"> <a href="https://github.com/ryo-ma/github-profile-trophy"><img src="https://github-profile-trophy.vercel.app/?username=himucodes" alt="himucodes" /></a> </p>
+
 
 - 🔭 I’m currently working on **Encryption Based IOT project.**
 
