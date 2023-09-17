@@ -1,7 +1,7 @@
 <h1 align="center">Hi 👋, I'm Himanshu Tiwari aka Himu</h1>
 <h3 align="center">I am multipotentialite.</h3>
 
-(img align="right" alt="Coding" width="400" src="https://miro.medium.com/max/2560/1*-KlOGKrl0EJsPWncAZ6FiQ.gif")
+<img align="right" alt="Coding" width="400" src="https://miro.medium.com/max/2560/1*-KlOGKrl0EJsPWncAZ6FiQ.gif" />
 [![MasterHead](https://i.pinimg.com/originals/f8/41/ac/f841ac2befaedda240c55a06b23b33ec.gif)]
 
 <p align="left"> <img src="https://komarev.com/ghpvc/?username=himucodes&label=Profile%20views&color=0e75b6&style=flat" alt="himucodes" /> </p>
@@ -21,11 +21,11 @@
 <h3 align="left">Connect with me:</h3>
 <p align="left">
 <a href="https://dev.to/himucodes" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/devto.svg" alt="himucodes" height="30" width="40" /></a>
-<a href="https://twitter.com/himucodes" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/twitter.svg" alt="himucodes" height="30" width="40" /></a>
-<a href="https://linkedin.com/in/himanshu tiwari" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/linked-in-alt.svg" alt="himanshu tiwari" height="30" width="40" /></a>
-<a href="https://www.youtube.com/c/himanshu-tiwari" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/youtube.svg" alt="himanshu-tiwari" height="30" width="40" /></a>
+<a href="https://twitter.com/Himucodes" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/twitter.svg" alt="himucodes" height="30" width="40" /></a>
+<a href="https://www.linkedin.com/in/himanshu-tiwari-374b81271/" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/linked-in-alt.svg" alt="himanshu tiwari" height="30" width="40" /></a>
+<a href="https://www.youtube.com/channel/Himanshu-Tiwari" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/youtube.svg" alt="himanshu-tiwari" height="30" width="40" /></a>
 <a href="https://www.hackerrank.com/himanshu tiwari" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/hackerrank.svg" alt="himanshu tiwari" height="30" width="40" /></a>
-<a href="https://www.leetcode.com/himucodes" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/leet-code.svg" alt="himucodes" height="30" width="40" /></a>
+<a href="https://www.leetcode.com/HimuCodes" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/leet-code.svg" alt="himucodes" height="30" width="40" /></a>
 <a href="https://discord.gg/#0441" target="blank"><img align="center" src="https://raw.githubusercontent.com/rahuldkjain/github-profile-readme-generator/master/src/images/icons/Social/discord.svg" alt="#0441" height="30" width="40" /></a>
 </p>
 
