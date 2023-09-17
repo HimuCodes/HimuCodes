@@ -1,8 +1,9 @@
+[![MasterHead](https://cdn.dribbble.com/users/1059583/screenshots/4171367/coding-freak.gif)](github.com/HimuCodes)
 <h1 align="center">Hi 👋, I'm Himanshu Tiwari aka Himu</h1>
 <h3 align="center">I am multipotentialite.</h3>
 
 <img align="right" alt="Coding" width="400" src="https://miro.medium.com/max/2560/1*-KlOGKrl0EJsPWncAZ6FiQ.gif" />
-[![MasterHead](https://i.pinimg.com/originals/f8/41/ac/f841ac2befaedda240c55a06b23b33ec.gif)]
+
 
 <p align="left"> <img src="https://komarev.com/ghpvc/?username=himucodes&label=Profile%20views&color=0e75b6&style=flat" alt="himucodes" /> </p>
 
