@@ -1,4 +1,4 @@
-[![MasterHead](https://cdn.dribbble.com/users/1059583/screenshots/4171367/coding-freak.gif)](github.com/HimuCodes)
+[![MasterHead](https://s3.crackedcdn.com/phpimages/article/2/8/3/922283.jpg)](github.com/HimuCodes)
 <h1 align="center">Hi 👋, I'm Himanshu Tiwari aka Himu</h1>
 <h3 align="center">I am multipotentialite.</h3>
 
