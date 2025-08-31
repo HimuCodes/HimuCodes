@@ -51,13 +51,16 @@ jobs:
           python update_profile.py
 
       - name: Add cache buster to README
-        if: exists('README.md')
         run: |
-          TS=$(date -u +%s)
-          sed -i -E "s|(https://raw.githubusercontent.com/HimuCodes/HimuCodes/main/dark.svg)(\\?b=[0-9]+)?|\\1?b=${TS}|g" README.md || true
-          sed -i -E "s|(https://raw.githubusercontent.com/HimuCodes/HimuCodes/main/light.svg)(\\?b=[0-9]+)?|\\1?b=${TS}|g" README.md || true
-          sed -i -E "s|(dark.svg)(\\?b=[0-9]+)?|dark.svg?b=${TS}|g" README.md || true
-          sed -i -E "s|(light.svg)(\\?b=[0-9]+)?|light.svg?b=${TS}|g" README.md || true
+          if [ -f README.md ]; then
+            TS=$(date -u +%s)
+            sed -i -E "s|(https://raw.githubusercontent.com/HimuCodes/HimuCodes/main/dark.svg)(\\?b=[0-9]+)?|\\1?b=${TS}|g" README.md || true
+            sed -i -E "s|(https://raw.githubusercontent.com/HimuCodes/HimuCodes/main/light.svg)(\\?b=[0-9]+)?|\\1?b=${TS}|g" README.md || true
+            sed -i -E "s|(dark.svg)(\\?b=[0-9]+)?|dark.svg?b=${TS}|g" README.md || true
+            sed -i -E "s|(light.svg)(\\?b=[0-9]+)?|light.svg?b=${TS}|g" README.md || true
+          else
+            echo "README.md not present, skipping cache buster"
+          fi
 
       - name: Commit changes
         run: |
