@@ -395,13 +395,16 @@ def heavy_stats(login: str) -> Tuple[int, int, int, int]:
             return heavy_stats(login)
 
         current_total = get_repo_commit_total(owner, repo)
-        if current_total == int(prev_total):
+        from_cache = current_total == int(prev_total)
+        if from_cache:
             # no change
             my_commits = int(prev_my)
             add_loc = int(prev_add)
             del_loc = int(prev_del)
         else:
             _, my_commits, add_loc, del_loc = scan_repo_history(owner, repo)
+        if DEBUG:
+            debug(f"[HEAVY] {full}: total={current_total} my_commits={my_commits} add={add_loc} del={del_loc} from_cache={from_cache}")
 
         updated_lines.append(f"{expected_hash} {current_total} {my_commits} {add_loc} {del_loc}\n")
         total_my_commits += my_commits
