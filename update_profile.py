@@ -531,6 +531,7 @@ def build_stats_container(tree: etree._Element, stats: Dict[str, Any]):
     container = tree.find(".//*[@id='stats_container']")
     if container is None:
         return
+    # Remove existing children (we rebuild consistently)
     for child in list(container):
         container.remove(child)
     x_base = int(container.get('x', '370'))
@@ -542,12 +543,20 @@ def build_stats_container(tree: etree._Element, stats: Dict[str, Any]):
         'commits': format_int(stats.get('commits', 0)),
         'followers': format_int(stats.get('followers', 0)),
     }
-    heavy = 'loc_net' in stats
-    if heavy:
+    heavy_has_data = 'loc_net' in stats  # actual heavy data presence
+    # Always show a LOC line so it does not disappear when DO_HEAVY=0.
+    if heavy_has_data:
         v.update({
             'loc_net': format_int(stats.get('loc_net', 0)),
             'loc_add': f"+{format_int(stats.get('loc_add', 0))}",
             'loc_del': f"-{format_int(stats.get('loc_del', 0))}",
+        })
+    else:
+        # Placeholder values when heavy scan skipped
+        v.update({
+            'loc_net': '--',
+            'loc_add': '+0',
+            'loc_del': '-0'
         })
     id_map = {
         'repo_data': 'repos',
@@ -559,6 +568,7 @@ def build_stats_container(tree: etree._Element, stats: Dict[str, Any]):
         'loc_add': 'loc_add',
         'loc_del': 'loc_del'
     }
+    # Apply truncation limits
     for key_id, max_c in MAX_VALUE_CHAR.items():
         sk = id_map.get(key_id)
         if sk and sk in v:
@@ -587,15 +597,15 @@ def build_stats_container(tree: etree._Element, stats: Dict[str, Any]):
             etree.SubElement(container, 'tspan', x=str(cursor_x), y=str(y), **{'class': 'keyColor'}).text = label_text.rstrip()
             etree.SubElement(container, 'tspan', **{'class': 'valueColor', 'id': id_attr}).text = value_text
             cursor_x += seg_width + gap_px
-    if heavy:
-        loc_line_y = y_base + 40
-        etree.SubElement(container, 'tspan', x=str(x_base), y=str(loc_line_y), **{'class': 'keyColor'}).text = 'Lines of Code:'
-        etree.SubElement(container, 'tspan', **{'class': 'valueColor', 'id': 'loc_data'}).text = v['loc_net']
-        etree.SubElement(container, 'tspan', **{'class': 'valueColor'}).text = ' ('
-        etree.SubElement(container, 'tspan', **{'class': 'addColor', 'id': 'loc_add'}).text = v['loc_add']
-        etree.SubElement(container, 'tspan', **{'class': 'valueColor'}).text = ', '
-        etree.SubElement(container, 'tspan', **{'class': 'delColor', 'id': 'loc_del'}).text = v['loc_del']
-        etree.SubElement(container, 'tspan', **{'class': 'valueColor'}).text = ')'
+    # LOC line always rendered (third line at +40)
+    loc_line_y = y_base + 40
+    etree.SubElement(container, 'tspan', x=str(x_base), y=str(loc_line_y), **{'class': 'keyColor'}).text = 'Lines of Code:'
+    etree.SubElement(container, 'tspan', **{'class': 'valueColor', 'id': 'loc_data'}).text = v['loc_net']
+    etree.SubElement(container, 'tspan', **{'class': 'valueColor'}).text = ' ('
+    etree.SubElement(container, 'tspan', **{'class': 'addColor', 'id': 'loc_add'}).text = v['loc_add']
+    etree.SubElement(container, 'tspan', **{'class': 'valueColor'}).text = ', '
+    etree.SubElement(container, 'tspan', **{'class': 'delColor', 'id': 'loc_del'}).text = v['loc_del']
+    etree.SubElement(container, 'tspan', **{'class': 'valueColor'}).text = ')'
 
 def wrap_tagline(tree: etree._Element):
     tag = tree.find(".//*[@id='tagline']")
