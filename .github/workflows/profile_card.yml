@@ -43,19 +43,29 @@ jobs:
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           USER_NAME: ${{ github.repository_owner }}
           BIRTHDATE: "2005-01-17"
-          DO_HEAVY: ${{ github.event_name != 'push' && '1' || '0' }}
-          FORCE_CACHE: "0"
+          DO_HEAVY: "1"           # Force heavy mode so commits/LOC populate
+          FORCE_CACHE: ${{ github.event_name == 'push' && '1' || '0' }}
           EMBED_FONT: "1"
+          DEBUG: "1"              # Emit heavy debug lines
         run: |
           python update_profile.py
+
+      - name: Add cache buster to README
+        if: exists('README.md')
+        run: |
+          TS=$(date -u +%s)
+          sed -i -E "s|(https://raw.githubusercontent.com/HimuCodes/HimuCodes/main/dark.svg)(\\?b=[0-9]+)?|\\1?b=${TS}|g" README.md || true
+          sed -i -E "s|(https://raw.githubusercontent.com/HimuCodes/HimuCodes/main/light.svg)(\\?b=[0-9]+)?|\\1?b=${TS}|g" README.md || true
+          sed -i -E "s|(dark.svg)(\\?b=[0-9]+)?|dark.svg?b=${TS}|g" README.md || true
+          sed -i -E "s|(light.svg)(\\?b=[0-9]+)?|light.svg?b=${TS}|g" README.md || true
 
       - name: Commit changes
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add dark.svg light.svg cache/*.txt || true
-            git commit -m "chore: update profile card"
+            git add dark.svg light.svg cache/*.txt README.md || true
+            git commit -m "chore: update profile card (heavy + cache-bust)"
             git push
           else
             echo "No changes."
