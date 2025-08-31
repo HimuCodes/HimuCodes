@@ -1,0 +1,72 @@
+# ---- Python bytecode / cache ----
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+.python-version
+
+# ---- Distribution / packaging ----
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+wheelhouse/
+
+# ---- Test / coverage artifacts ----
+.pytest_cache/
+.coverage*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.pyre/
+
+# ---- Logs & dumps ----
+*.log
+*.out
+*.err
+*.pid
+*.dump
+
+# ---- IDE / Editor ----
+.idea/
+.vscode/
+*.swp
+*.swo
+*.orig
+
+# ---- OS / File manager ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Environment / secrets ----
+.env
+.env.*
+*.secret
+
+# ---- Jupyter / notebooks ----
+.ipynb_checkpoints/
+
+# ---- Images / binary artifacts (keep logo.png tracked; add others if generated) ----
+# *.png
+# *.svg
+
+# ---- Cache directory notes ----
+# The project has a cache/ directory containing fonts & requirement cache.
+# If you decide those are re-generable, uncomment the next line to ignore.
+# cache/
+
+# ---- PowerShell history (local) ----
+*.ps1.history
+
+# ---- Misc ----
+*.bak
+*.tmp
+~$*
+
