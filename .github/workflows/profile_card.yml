@@ -44,7 +44,7 @@ jobs:
           USER_NAME: ${{ github.repository_owner }}
           BIRTHDATE: "2005-01-17"
           DO_HEAVY: "1"           # Force heavy mode so commits/LOC populate
-          FORCE_CACHE: ${{ github.event_name == 'push' && '1' || '0' }}
+          FORCE_CACHE: "1"
           EMBED_FONT: "1"
           DEBUG: "1"              # Emit heavy debug lines
         run: |
