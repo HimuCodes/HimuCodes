@@ -24,7 +24,7 @@ text, tspan {white-space: pre; font-family: 'JetBrains Mono', monospace;}
   <tspan x="370" y="30" class="headerColor">himu@audbhida</tspan>
   <tspan x="370" y="50" class="accentColor">------------</tspan>
   <tspan x="370" y="70" class="keyColor">OS</tspan>: <tspan class="valueColor">Windows 11, Linux (EndeavourOS), DietPi (Raspberry Pi)</tspan>
-  <tspan x="370" y="90" class="keyColor">Uptime</tspan>: <tspan id="age_data" class="valueColor">21 years, 0 months, 8 days</tspan>
+  <tspan x="370" y="90" class="keyColor">Uptime</tspan>: <tspan id="age_data" class="valueColor">21 years, 0 months, 9 days</tspan>
   <tspan x="370" y="110" class="keyColor">Host</tspan>: <tspan class="valueColor">Vishwaniketan iMEET</tspan>
   <tspan x="370" y="130" class="keyColor">Kernel</tspan>: <tspan class="valueColor">Electronics and Telecommunications engineering</tspan>
   <tspan x="370" y="150" class="keyColor">IDE</tspan>: <tspan class="valueColor">CLion, PyCharm, Rust Rover, WebStorm</tspan>
