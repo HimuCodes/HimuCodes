@@ -1,6 +1,6 @@
 <a href="https://github.com/HimuCodes">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/HimuCodes/HimuCodes/main/dark.svg?b=1779174611">
-    <img alt="HimuCodes's GitHub Profile README" src="https://raw.githubusercontent.com/HimuCodes/HimuCodes/main/light.svg?b=1779174611">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/HimuCodes/HimuCodes/main/dark.svg?b=1779260901">
+    <img alt="HimuCodes's GitHub Profile README" src="https://raw.githubusercontent.com/HimuCodes/HimuCodes/main/light.svg?b=1779260901">
   </picture>
 </a>
