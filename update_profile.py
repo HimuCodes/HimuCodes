@@ -125,6 +125,12 @@ def gql(query: str, variables: Dict[str, Any], tag: str):
                     debug(f"{tag}: rate limit encountered, backoff retry {attempt}")
                     time.sleep(RETRY_BACKOFF ** attempt)
                     continue
+                if (
+                    'resource not accessible by personal access token' in messages.lower()
+                    and data.get('data') is not None
+                ):
+                    debug(f"{tag}: partial GraphQL response due to token scope, using available data")
+                    return data
                 raise RuntimeError(f"{tag} GraphQL errors: {messages}")
             return data
         except (requests.Timeout, requests.ConnectionError) as e:
@@ -207,7 +213,10 @@ def get_repos_and_stars(login: str) -> Tuple[int, int, int]:
         repos = data["data"]["user"]["repositories"]
         total_count = repos["totalCount"]
         for e in repos["edges"]:
-            stars += e["node"]["stargazers"]["totalCount"]
+            node = e.get("node")
+            if not node:
+                continue
+            stars += node["stargazers"]["totalCount"]
         if not repos["pageInfo"]["hasNextPage"]:
             break
         cursor = repos["pageInfo"]["endCursor"]

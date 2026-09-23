@@ -50,6 +50,33 @@ EMPTY_TOTAL_COMMITS = {
     }
 }
 
+PARTIAL_ACCESS_REPOS_JSON = {
+    "data": {
+        "user": {
+            "repositories": {
+                "totalCount": 2,
+                "edges": [
+                    {"node": None},
+                    {"node": {"stargazers": {"totalCount": 3}, "nameWithOwner": "HimuCodes/repo-visible"}}
+                ],
+                "pageInfo": {"endCursor": None, "hasNextPage": False}
+            }
+        }
+    },
+    "errors": [{"message": "Resource not accessible by personal access token"}]
+}
+
+PARTIAL_ACCESS_CONTRIB_JSON = {
+    "data": {
+        "user": {
+            "repositories": {
+                "totalCount": 5,
+                "pageInfo": {"endCursor": None, "hasNextPage": False}
+            }
+        }
+    }
+}
+
 def fake_post(url, json=None, headers=None, timeout=40):
     q = (json or {}).get("query", "")
     # order of checks matters
@@ -64,6 +91,14 @@ def fake_post(url, json=None, headers=None, timeout=40):
     if "history(first: 0)" in q:
         return FakeResp(EMPTY_TOTAL_COMMITS)
     # fallback default
+    return FakeResp({"data": {}})
+
+def fake_post_partial_access(url, json=None, headers=None, timeout=40):
+    q = (json or {}).get("query", "")
+    if "ownerAffiliations: OWNER)" in q and "stargazers" in q:
+        return FakeResp(PARTIAL_ACCESS_REPOS_JSON)
+    if "ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER]" in q:
+        return FakeResp(PARTIAL_ACCESS_CONTRIB_JSON)
     return FakeResp({"data": {}})
 
 class FakeResp:
@@ -117,3 +152,18 @@ def test_offline_basic(mock_post, monkeypatch, tmp_path):
         el = root.find(f".//*[@id='{stat_id}']")
         assert el is not None, f"Missing element id={stat_id}"
         assert el.text and el.text.strip() != "--", f"Placeholder not replaced for {stat_id}"
+
+@patch("requests.post", side_effect=fake_post_partial_access)
+def test_repos_and_stars_partial_access(mock_post, monkeypatch):
+    monkeypatch.setenv("USER_NAME", "HimuCodes")
+
+    repo_root = pathlib.Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    update_profile = importlib.import_module("update_profile")
+    importlib.reload(update_profile)
+
+    repos, stars, contrib = update_profile.get_repos_and_stars("HimuCodes")
+    assert repos == 2
+    assert stars == 3
+    assert contrib == 5
