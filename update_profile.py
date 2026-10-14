@@ -248,30 +248,48 @@ def get_repos_and_stars(login: str) -> Tuple[int, int, int]:
 
 # ------------------ Heavy Scan (Commits & LOC) ------------------
 def init_cache_if_needed(repos_edges: List[str]):
-    if FORCE_CACHE or not os.path.exists(CACHE_FILE):
-        write_cache_header()
-        with open(CACHE_FILE, "a", encoding="utf-8") as f:
-            for full in repos_edges:
-                f.write(f"{hashlib.sha256(full.encode()).hexdigest()} 0 0 0 0\n")
+    expected_hashes = [
+        hashlib.sha256(repo.encode()).hexdigest()
+        for repo in repos_edges
+    ]
+
+    rebuild = FORCE_CACHE or not os.path.exists(CACHE_FILE)
+
+    if not rebuild:
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            repo_lines = lines[CACHE_COMMENT_LINES:]
+            cached_hashes = []
+
+            for line in repo_lines:
+                parts = line.split()
+                if len(parts) != 5:
+                    rebuild = True
+                    break
+                cached_hashes.append(parts[0])
+
+            if cached_hashes != expected_hashes:
+                rebuild = True
+
+        except (OSError, ValueError):
+            rebuild = True
+
+    if not rebuild:
         return
 
-    # Validate repo list length
-    with open(CACHE_FILE, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-    repo_lines = lines[CACHE_COMMENT_LINES:]
-    if len(repo_lines) != len(repos_edges):
-        # Rebuild
-        write_cache_header()
-        with open(CACHE_FILE, "a", encoding="utf-8") as f:
-            for full in repos_edges:
-                f.write(f"{hashlib.sha256(full.encode()).hexdigest()} 0 0 0 0\n")
+    write_cache_header()
+    with open(CACHE_FILE, "a", encoding="utf-8") as f:
+        for repo_hash in expected_hashes:
+            f.write(f"{repo_hash} 0 0 0 0\n")
 
 def write_cache_header():
     header = [
         "Cache File for LOC / Commit Stats\n",
         "Format: sha256(repo) totalCommits myCommits additions deletions\n",
         f"User: {USER_NAME}\n",
-        f"Generated: {datetime.datetime.utcnow().isoformat()}\n",
+        f"Generated: {datetime.datetime.now(datetime.UTC).isoformat()}\n",
         "---\n"
     ]
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
@@ -323,26 +341,29 @@ def get_repo_commit_total(owner: str, repo: str) -> int:
         return 0
     return ref["target"]["history"]["totalCount"]
 
-def scan_repo_history(owner: str, repo: str) -> Tuple[int, int, int, int]:
-    """Return (total_commits, my_commits, additions, deletions) for default branch."""
+def scan_repo_history(owner: str, repo: str, user_id: str) -> Tuple[int, int, int, int]:
+    """Return (total_commits, my_commits, additions, deletions) for the default branch.
+
+    The LOC scan asks GitHub to filter commit history by this user's GitHub ID,
+    instead of downloading every commit and filtering locally.
+    """
     total = get_repo_commit_total(owner, repo)
     my_commits = additions = deletions = 0
     if total == 0:
         return 0, 0, 0, 0
-    # page through commit history
+
     cursor = None
     while True:
         count_query("loc_repo_scan")
         query = """
-        query($owner: String!, $repo: String!, $cursor: String){
+        query($owner: String!, $repo: String!, $cursor: String, $userId: ID!){
           repository(owner: $owner, name: $repo){
             defaultBranchRef{
               target{
                 ... on Commit {
-                  history(first: 100, after: $cursor){
+                  history(first: 100, after: $cursor, author: {id: $userId}){
                     edges{
                       node{
-                        author{ user{ login } }
                         additions
                         deletions
                       }
@@ -354,25 +375,38 @@ def scan_repo_history(owner: str, repo: str) -> Tuple[int, int, int, int]:
             }
           }
         }"""
-        data = gql(query, {"owner": owner, "repo": repo, "cursor": cursor}, "loc_repo_scan")
-        ref = data["data"]["repository"]["defaultBranchRef"]
-        if not ref:
+        data = gql(
+            query,
+            {"owner": owner, "repo": repo, "cursor": cursor, "userId": user_id},
+            "loc_repo_scan",
+        )
+        repository = (data.get("data") or {}).get("repository")
+        if not repository:
+            debug(f"{owner}/{repo}: repository unavailable during LOC scan")
             break
+
+        ref = repository.get("defaultBranchRef")
+        if not ref or not ref.get("target"):
+            break
+
         history = ref["target"]["history"]
-        for edge in history["edges"]:
-            node = edge["node"]
-            if node["author"]["user"] and node["author"]["user"]["login"].lower() == USER_NAME.lower():
-                my_commits += 1
-                additions += node["additions"]
-                deletions += node["deletions"]
+        for edge in history.get("edges", []):
+            node = edge.get("node")
+            if not node:
+                continue
+            my_commits += 1
+            additions += node.get("additions", 0)
+            deletions += node.get("deletions", 0)
+
         if not history["pageInfo"]["hasNextPage"]:
             break
         cursor = history["pageInfo"]["endCursor"]
+
     return total, my_commits, additions, deletions
 
 RECURSION_GUARD = 0
 
-def heavy_stats(login: str) -> Tuple[int, int, int, int]:
+def heavy_stats(login: str, user_id: str) -> Tuple[int, int, int, int]:
     """Return (my_commits, loc_add, loc_del, loc_net)."""
     global RECURSION_GUARD
     repos = collect_repo_full_names(login)
@@ -411,7 +445,7 @@ def heavy_stats(login: str) -> Tuple[int, int, int, int]:
             add_loc = int(prev_add)
             del_loc = int(prev_del)
         else:
-            _, my_commits, add_loc, del_loc = scan_repo_history(owner, repo)
+            _, my_commits, add_loc, del_loc = scan_repo_history(owner, repo, user_id)
         if DEBUG:
             debug(f"[HEAVY] {full}: total={current_total} my_commits={my_commits} add={add_loc} del={del_loc} from_cache={from_cache}")
 
@@ -699,7 +733,7 @@ def main():
     commits = loc_add = loc_del = loc_net = 0
     if DO_HEAVY:
         print("Running heavy scan (commits & LOC)...")
-        commits, loc_add, loc_del, loc_net = heavy_stats(USER_NAME)
+        commits, loc_add, loc_del, loc_net = heavy_stats(USER_NAME, user_id)
 
     stats = {
         "age": age_str,

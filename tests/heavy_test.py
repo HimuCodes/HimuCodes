@@ -74,7 +74,7 @@ COMMIT_HISTORY = {
                 "target": {
                     "history": {
                         "edges": [
-                            {"node": {"author": {"user": {"login": USER}}, "additions": 10, "deletions": 2}}
+                            {"node": {"additions": 10, "deletions": 2}}
                         ],
                         "pageInfo": {"hasNextPage": False, "endCursor": None}
                     }
@@ -99,7 +99,7 @@ def fake_post(url, json=None, headers=None, timeout=40):
         return FakeResp(HEAVY_LIST)
     if "history(first: 0)" in q:
         return FakeResp(COMMIT_TOTAL)
-    if "history(first: 100" in q and "additions" in q:
+    if "history(first: 100" in q and "author: {id: $userId}" in q and "additions" in q:
         return FakeResp(COMMIT_HISTORY)
     return FakeResp({"data": {}})
 
