@@ -185,174 +185,211 @@ def get_followers(login: str) -> int:
 
 def get_repos_and_stars(login: str) -> Tuple[int, int, int]:
     """
-    Returns (owned_repo_count, total_stars_on_owned, contributed_repo_count)
-    contributed_repo_count counts OWNER + COLLABORATOR + ORGANIZATION_MEMBER
+    Return (owned_repo_count, stars_on_public_owned_repos, contributed_repo_count).
+
+    Repo totals are queried without repository nodes so a fine-grained PAT does
+    not need access to every private repository just to count them. Star totals
+    intentionally use public owned repositories only.
     """
-    # Owned repos
     count_query("repos_stars")
-    owned_query = """
+    owned_count_query = """
+    query($login: String!){
+      user(login: $login){
+        repositories(first: 1, ownerAffiliations: OWNER){
+          totalCount
+        }
+      }
+    }"""
+    data = gql(owned_count_query, {"login": login}, "repos_stars")
+    owned_total = data["data"]["user"]["repositories"]["totalCount"]
+
+    stars = 0
+    cursor = None
+    public_stars_query = """
     query($login: String!, $cursor: String){
       user(login: $login){
-        repositories(first: 100, after: $cursor, ownerAffiliations: OWNER){
-          totalCount
+        repositories(
+          first: 100,
+          after: $cursor,
+          ownerAffiliations: OWNER,
+          privacy: PUBLIC
+        ){
           edges{
             node{
               stargazers{ totalCount }
-              nameWithOwner
             }
           }
           pageInfo{ endCursor hasNextPage }
         }
       }
     }"""
-    stars = 0
-    total_count = None
-    cursor = None
     while True:
-        data = gql(owned_query, {"login": login, "cursor": cursor}, "repos_stars")
+        count_query("repos_stars")
+        data = gql(
+            public_stars_query,
+            {"login": login, "cursor": cursor},
+            "repos_stars",
+        )
         repos = data["data"]["user"]["repositories"]
-        total_count = repos["totalCount"]
-        for e in repos["edges"]:
-            node = e.get("node")
-            if not node:
-                continue
-            stars += node["stargazers"]["totalCount"]
+        for edge in repos.get("edges", []):
+            node = edge.get("node")
+            if node:
+                stars += node["stargazers"]["totalCount"]
         if not repos["pageInfo"]["hasNextPage"]:
             break
         cursor = repos["pageInfo"]["endCursor"]
-        count_query("repos_stars")
 
-    # Contributed set (owner + collaborator + org member)
     count_query("repos_stars")
     contrib_query = """
-    query($login: String!, $cursor: String){
+    query($login: String!){
       user(login: $login){
-        repositories(first: 100, after: $cursor, ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER]){
+        repositories(
+          first: 1,
+          ownerAffiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER]
+        ){
           totalCount
-          pageInfo{ endCursor hasNextPage }
         }
       }
     }"""
-    cursor = None
-    contributed_total = None
-    while True:
-        data = gql(contrib_query, {"login": login, "cursor": cursor}, "repos_stars")
-        repos = data["data"]["user"]["repositories"]
-        contributed_total = repos["totalCount"]
-        if not repos["pageInfo"]["hasNextPage"]:
-            break
-        cursor = repos["pageInfo"]["endCursor"]
-        count_query("repos_stars")
+    data = gql(contrib_query, {"login": login}, "repos_stars")
+    contributed_total = data["data"]["user"]["repositories"]["totalCount"]
 
-    return total_count, stars, contributed_total
+    return owned_total, stars, contributed_total
 
 # ------------------ Heavy Scan (Commits & LOC) ------------------
-def init_cache_if_needed(repos_edges: List[str]):
-    expected_hashes = [
-        hashlib.sha256(repo.encode()).hexdigest()
-        for repo in repos_edges
-    ]
+CacheEntry = Tuple[str, int, int, int, int]
+# CacheEntry = (default_branch_head_oid, total_commits, my_commits, additions, deletions)
 
-    rebuild = FORCE_CACHE or not os.path.exists(CACHE_FILE)
 
-    if not rebuild:
+def load_cache() -> Dict[str, CacheEntry]:
+    """Load cached repo stats keyed by sha256(nameWithOwner).
+
+    The legacy five-column cache is accepted for one migration run. Because it
+    has no branch HEAD OID, those entries are considered stale once and are
+    rewritten in the v2 format.
+    """
+    if FORCE_CACHE or not os.path.exists(CACHE_FILE):
+        return {}
+
+    entries: Dict[str, CacheEntry] = {}
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()[CACHE_COMMENT_LINES:]
+    except OSError:
+        return {}
+
+    for line in lines:
+        parts = line.split()
         try:
-            with open(CACHE_FILE, "r", encoding="utf-8") as f:
-                lines = f.readlines()
+            if len(parts) == 6:
+                repo_hash, head_oid, total, mine, additions, deletions = parts
+                entries[repo_hash] = (
+                    head_oid,
+                    int(total),
+                    int(mine),
+                    int(additions),
+                    int(deletions),
+                )
+            elif len(parts) == 5:
+                # Legacy v1: hash total myCommits additions deletions
+                repo_hash, total, mine, additions, deletions = parts
+                entries[repo_hash] = (
+                    "",
+                    int(total),
+                    int(mine),
+                    int(additions),
+                    int(deletions),
+                )
+        except ValueError:
+            debug(f"Ignoring malformed cache line: {line.strip()}")
 
-            repo_lines = lines[CACHE_COMMENT_LINES:]
-            cached_hashes = []
+    return entries
 
-            for line in repo_lines:
-                parts = line.split()
-                if len(parts) != 5:
-                    rebuild = True
-                    break
-                cached_hashes.append(parts[0])
 
-            if cached_hashes != expected_hashes:
-                rebuild = True
-
-        except (OSError, ValueError):
-            rebuild = True
-
-    if not rebuild:
-        return
-
-    write_cache_header()
-    with open(CACHE_FILE, "a", encoding="utf-8") as f:
-        for repo_hash in expected_hashes:
-            f.write(f"{repo_hash} 0 0 0 0\n")
-
-def write_cache_header():
+def write_cache(entries: Dict[str, CacheEntry]):
     header = [
         "Cache File for LOC / Commit Stats\n",
-        "Format: sha256(repo) totalCommits myCommits additions deletions\n",
+        "Format: sha256(repo) headOid totalCommits myCommits additions deletions\n",
         f"User: {USER_NAME}\n",
         f"Generated: {datetime.datetime.now(datetime.UTC).isoformat()}\n",
-        "---\n"
+        "---\n",
     ]
+
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         f.writelines(header)
+        for repo_hash, entry in entries.items():
+            head_oid, total, mine, additions, deletions = entry
+            f.write(
+                f"{repo_hash} {head_oid or '-'} {total} {mine} "
+                f"{additions} {deletions}\n"
+            )
 
-def collect_repo_full_names(login: str) -> List[str]:
-    # Reuse repo listing for owner affiliations only (scope for heavy scan)
+
+def collect_repo_states(login: str) -> List[Tuple[str, str, int]]:
+    """Return (nameWithOwner, default-branch HEAD OID, total commits) for owned repos.
+
+    Fetching state for all repositories in one paginated query makes an unchanged
+    daily run cheap: the expensive per-repo author history query only runs when a
+    repository's default branch HEAD actually changes.
+    """
     query = """
     query($login: String!, $cursor: String){
       user(login: $login){
         repositories(first: 100, after: $cursor, ownerAffiliations: OWNER){
           edges{
-            node{ nameWithOwner }
+            node{
+              nameWithOwner
+              defaultBranchRef{
+                target{
+                  ... on Commit {
+                    oid
+                    history(first: 0){ totalCount }
+                  }
+                }
+              }
+            }
           }
           pageInfo{ endCursor hasNextPage }
         }
       }
     }"""
+
     cursor = None
-    full_names = []
+    states: List[Tuple[str, str, int]] = []
+
     while True:
         count_query("loc_list_repos")
         data = gql(query, {"login": login, "cursor": cursor}, "loc_list_repos")
         repos = data["data"]["user"]["repositories"]
-        for e in repos["edges"]:
-            full_names.append(e["node"]["nameWithOwner"])
+
+        for edge in repos.get("edges", []):
+            node = edge.get("node")
+            if not node:
+                continue
+
+            ref = node.get("defaultBranchRef")
+            target = ref.get("target") if ref else None
+            if target:
+                head_oid = target.get("oid") or "-"
+                total = target.get("history", {}).get("totalCount", 0)
+            else:
+                head_oid = "-"
+                total = 0
+
+            states.append((node["nameWithOwner"], head_oid, total))
+
         if not repos["pageInfo"]["hasNextPage"]:
             break
         cursor = repos["pageInfo"]["endCursor"]
-    return full_names
 
-def get_repo_commit_total(owner: str, repo: str) -> int:
-    count_query("loc_repo_scan")
-    query = """
-    query($owner: String!, $repo: String!){
-      repository(owner: $owner, name: $repo){
-        defaultBranchRef{
-          target{
-            ... on Commit {
-              history(first: 0){ totalCount }
-            }
-          }
-        }
-      }
-    }"""
-    data = gql(query, {"owner": owner, "repo": repo}, "loc_repo_scan")
-    ref = data["data"]["repository"]["defaultBranchRef"]
-    if not ref:
-        return 0
-    return ref["target"]["history"]["totalCount"]
+    return states
 
-def scan_repo_history(owner: str, repo: str, user_id: str) -> Tuple[int, int, int, int]:
-    """Return (total_commits, my_commits, additions, deletions) for the default branch.
 
-    The LOC scan asks GitHub to filter commit history by this user's GitHub ID,
-    instead of downloading every commit and filtering locally.
-    """
-    total = get_repo_commit_total(owner, repo)
+def scan_repo_history(owner: str, repo: str, user_id: str) -> Tuple[int, int, int]:
+    """Return (my_commits, additions, deletions) for the default branch."""
     my_commits = additions = deletions = 0
-    if total == 0:
-        return 0, 0, 0, 0
-
     cursor = None
+
     while True:
         count_query("loc_repo_scan")
         query = """
@@ -377,19 +414,26 @@ def scan_repo_history(owner: str, repo: str, user_id: str) -> Tuple[int, int, in
         }"""
         data = gql(
             query,
-            {"owner": owner, "repo": repo, "cursor": cursor, "userId": user_id},
+            {
+                "owner": owner,
+                "repo": repo,
+                "cursor": cursor,
+                "userId": user_id,
+            },
             "loc_repo_scan",
         )
+
         repository = (data.get("data") or {}).get("repository")
         if not repository:
             debug(f"{owner}/{repo}: repository unavailable during LOC scan")
             break
 
         ref = repository.get("defaultBranchRef")
-        if not ref or not ref.get("target"):
+        target = ref.get("target") if ref else None
+        if not target:
             break
 
-        history = ref["target"]["history"]
+        history = target["history"]
         for edge in history.get("edges", []):
             node = edge.get("node")
             if not node:
@@ -402,62 +446,63 @@ def scan_repo_history(owner: str, repo: str, user_id: str) -> Tuple[int, int, in
             break
         cursor = history["pageInfo"]["endCursor"]
 
-    return total, my_commits, additions, deletions
+    return my_commits, additions, deletions
 
-RECURSION_GUARD = 0
 
 def heavy_stats(login: str, user_id: str) -> Tuple[int, int, int, int]:
     """Return (my_commits, loc_add, loc_del, loc_net)."""
-    global RECURSION_GUARD
-    repos = collect_repo_full_names(login)
-    init_cache_if_needed(repos)
-    # load cache lines
-    with open(CACHE_FILE, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-    repo_lines = lines[CACHE_COMMENT_LINES:]
+    states = collect_repo_states(login)
+    cache = load_cache()
+    updated: Dict[str, CacheEntry] = {}
 
-    # If lengths mismatch after rebuild, refetch
-    if len(repo_lines) != len(repos):
-        init_cache_if_needed(repos)
-        with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-        repo_lines = lines[CACHE_COMMENT_LINES:]
+    total_my_commits = 0
+    total_add = 0
+    total_del = 0
 
-    updated_lines = []
-    total_my_commits = total_add = total_del = 0
+    for full_name, head_oid, current_total in states:
+        repo_hash = hashlib.sha256(full_name.encode()).hexdigest()
+        cached = cache.get(repo_hash)
 
-    for i, full in enumerate(repos):
-        repo_hash, prev_total, prev_my, prev_add, prev_del = repo_lines[i].split()
-        expected_hash = hashlib.sha256(full.encode()).hexdigest()
-        owner, repo = full.split("/")
-        if repo_hash != expected_hash:
-            if RECURSION_GUARD > 1:  # prevent endless recursion
-                raise RuntimeError("Cache hash mismatch recursion guard triggered")
-            RECURSION_GUARD += 1
-            init_cache_if_needed(repos)
-            return heavy_stats(login)
+        from_cache = bool(
+            cached
+            and cached[0] == head_oid
+            and cached[1] == current_total
+        )
 
-        current_total = get_repo_commit_total(owner, repo)
-        from_cache = current_total == int(prev_total)
         if from_cache:
-            # no change
-            my_commits = int(prev_my)
-            add_loc = int(prev_add)
-            del_loc = int(prev_del)
+            _, _, my_commits, add_loc, del_loc = cached
+        elif current_total == 0 or head_oid == "-":
+            my_commits = add_loc = del_loc = 0
         else:
-            _, my_commits, add_loc, del_loc = scan_repo_history(owner, repo, user_id)
-        if DEBUG:
-            debug(f"[HEAVY] {full}: total={current_total} my_commits={my_commits} add={add_loc} del={del_loc} from_cache={from_cache}")
+            owner, repo = full_name.split("/", 1)
+            my_commits, add_loc, del_loc = scan_repo_history(
+                owner,
+                repo,
+                user_id,
+            )
 
-        updated_lines.append(f"{expected_hash} {current_total} {my_commits} {add_loc} {del_loc}\n")
+        updated[repo_hash] = (
+            head_oid,
+            current_total,
+            my_commits,
+            add_loc,
+            del_loc,
+        )
+
+        if DEBUG:
+            debug(
+                f"[HEAVY] {full_name}: head={head_oid[:8]} "
+                f"total={current_total} my_commits={my_commits} "
+                f"add={add_loc} del={del_loc} from_cache={from_cache}"
+            )
+
         total_my_commits += my_commits
         total_add += add_loc
         total_del += del_loc
 
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        f.writelines(lines[:CACHE_COMMENT_LINES] + updated_lines)
-
+    write_cache(updated)
     return total_my_commits, total_add, total_del, total_add - total_del
+
 
 def embed_font_if_requested(svg_text: str) -> str:
     """If EMBED_FONT is enabled, replace a Google Fonts @import with inline @font-face rules.
